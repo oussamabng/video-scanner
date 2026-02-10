@@ -4,7 +4,7 @@
 import { Camera } from 'react-native-vision-camera';
 
 function normalizePermissionStatus(status) {
-  return status === 'granted' ? 'granted' : 'denied';
+  return status === 'granted' || status === 'authorized' ? 'granted' : 'denied';
 }
 
 export async function checkCameraPermission() {

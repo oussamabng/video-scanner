@@ -41,6 +41,19 @@ export function useReceiptScannerController() {
   const machineStateRef = useRef(machineState);
   const signalsRef = useRef(null);
 
+  const completeScanning = useCallback((savedVideoPath = null) => {
+    if (machineStateRef.current.phase !== ScannerPhase.SCANNING) {
+      return;
+    }
+
+    setRecordingEnabled(false);
+    dispatch({
+      type: ScannerEventType.FINISH_SCANNING,
+      now: Date.now(),
+      savedVideoPath,
+    });
+  }, []);
+
   useEffect(() => {
     machineStateRef.current = machineState;
   }, [machineState]);
@@ -131,6 +144,11 @@ export function useReceiptScannerController() {
       }
 
       if (!currentState.activeError && !detectedError) {
+        if (currentState.progress >= 95) {
+          completeScanning();
+          return;
+        }
+
         dispatch({
           type: ScannerEventType.PROGRESS_TICK,
           step: getProgressStep(),
@@ -142,7 +160,7 @@ export function useReceiptScannerController() {
     return () => {
       clearInterval(timer);
     };
-  }, [machineState.phase, updateSignals]);
+  }, [completeScanning, machineState.phase, updateSignals]);
 
   const startScanning = useCallback(async () => {
     const status = await requestCameraPermission();
@@ -158,16 +176,12 @@ export function useReceiptScannerController() {
   }, []);
 
   const finishScanning = useCallback(() => {
-    setRecordingEnabled(false);
-  }, []);
+    completeScanning();
+  }, [completeScanning]);
 
   const onRecordingFinished = useCallback((video) => {
-    dispatch({
-      type: ScannerEventType.FINISH_SCANNING,
-      now: Date.now(),
-      savedVideoPath: video?.path || null,
-    });
-  }, []);
+    completeScanning(video?.path || null);
+  }, [completeScanning]);
 
   const onRecordingError = useCallback(() => {
     dispatch({
