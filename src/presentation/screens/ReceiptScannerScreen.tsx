@@ -1,7 +1,7 @@
 // @ts-nocheck
 // src/presentation/screens/ReceiptScannerScreen.jsx
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import {
   StatusBar,
   StyleSheet,
@@ -32,15 +32,20 @@ export default function ReceiptScannerScreen() {
   const frameWidth = Math.min(screenWidth * 0.76, 350);
   const frameHeight = Math.min(frameWidth * 2.12, screenHeight * 0.66);
 
+  const cameraRef = useRef(null);
+
   const {
     uiModel,
     permissionStatus,
     cameraActive,
+    recordingEnabled,
     onCameraReady,
     startScanning,
-    cancelScanning,
+    finishScanning,
     scanAnother,
     viewReceipt,
+    onRecordingFinished,
+    onRecordingError,
   } = useReceiptScannerController();
 
   const scanLineTravelDistance = useMemo(
@@ -81,9 +86,13 @@ export default function ReceiptScannerScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#050608" />
 
       <VisionCameraAdapter
+        ref={cameraRef}
         style={StyleSheet.absoluteFill}
         isActive={cameraActive}
+        recordingEnabled={recordingEnabled}
         onReady={onCameraReady}
+        onRecordingFinished={onRecordingFinished}
+        onRecordingError={onRecordingError}
       />
       <View style={styles.dimLayer} pointerEvents="none" />
 
@@ -158,12 +167,16 @@ export default function ReceiptScannerScreen() {
             phase={uiModel.phase}
             permissionStatus={permissionStatus}
             onStartScanning={startScanning}
-            onCancelScanning={cancelScanning}
+            onFinishScanning={finishScanning}
             onViewReceipt={viewReceipt}
             onScanAnother={scanAnother}
           />
 
           <Text style={styles.tipText}>{uiModel.tip}</Text>
+
+          {uiModel.isComplete && uiModel.savedVideoPath ? (
+            <Text style={styles.savedPathText}>Video saved on device: {uiModel.savedVideoPath}</Text>
+          ) : null}
 
           {permissionStatus === 'denied' ? (
             <Text style={styles.permissionWarning}>
@@ -243,6 +256,15 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
 
+
+  savedPathText: {
+    color: '#86EFAC',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 8,
+    paddingHorizontal: 24,
+    textAlign: 'center',
+  },
   tipText: {
     color: 'rgba(236, 242, 252, 0.86)',
     fontSize: 13,

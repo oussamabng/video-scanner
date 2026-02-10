@@ -6,6 +6,7 @@ import {
   ERROR_HOLD_MS,
   ScannerEventType,
   ScannerPhase,
+  ScannerSimulationScenario,
   createInitialScannerState,
 } from '../../domain/scanner/types';
 import { getScannerUiModel, scannerReducer } from '../../domain/scanner/scannerMachine';
@@ -22,6 +23,9 @@ import {
 import { subscribeToMotionSignals } from '../../infrastructure/sensors/motion';
 
 const SCAN_TICK_MS = 160;
+// Default demo mode is clean scanning (no simulated errors).
+// To test error states locally, switch this to ScannerSimulationScenario.MOCK_ERRORS.
+const DEFAULT_SIMULATION_SCENARIO = ScannerSimulationScenario.NO_ERRORS;
 
 function getProgressStep() {
   return 0.85 + Math.random() * 1.9;
@@ -32,6 +36,7 @@ export function useReceiptScannerController() {
   const [permissionStatus, setPermissionStatus] = useState('unknown');
   const [cameraReady, setCameraReady] = useState(false);
   const [latestSignals, setLatestSignals] = useState(null);
+  const [recordingEnabled, setRecordingEnabled] = useState(false);
 
   const machineStateRef = useRef(machineState);
   const signalsRef = useRef(null);
@@ -81,13 +86,24 @@ export function useReceiptScannerController() {
       return undefined;
     }
 
+    const simulationScenario = DEFAULT_SIMULATION_SCENARIO;
+
     const timer = setInterval(() => {
       const now = Date.now();
       const currentState = machineStateRef.current;
 
+      const forcedErrorCode =
+        simulationScenario === ScannerSimulationScenario.MOCK_ERRORS &&
+        currentState.progress > 25 &&
+        currentState.progress < 40
+          ? 'TOO_FAST'
+          : null;
+
       const simulatedSignals = createSimulatedSignals({
         isScanning: true,
         progress: currentState.progress,
+        forcedErrorCode,
+        scenario: simulationScenario,
       });
 
       const currentSignals = updateSignals(simulatedSignals);
@@ -133,6 +149,7 @@ export function useReceiptScannerController() {
     setPermissionStatus(status);
 
     if (status === 'granted') {
+      setRecordingEnabled(true);
       dispatch({
         type: ScannerEventType.START_SCANNING,
         now: Date.now(),
@@ -140,7 +157,19 @@ export function useReceiptScannerController() {
     }
   }, []);
 
-  const cancelScanning = useCallback(() => {
+  const finishScanning = useCallback(() => {
+    setRecordingEnabled(false);
+  }, []);
+
+  const onRecordingFinished = useCallback((video) => {
+    dispatch({
+      type: ScannerEventType.FINISH_SCANNING,
+      now: Date.now(),
+      savedVideoPath: video?.path || null,
+    });
+  }, []);
+
+  const onRecordingError = useCallback(() => {
     dispatch({
       type: ScannerEventType.CANCEL_SCANNING,
       now: Date.now(),
@@ -150,6 +179,7 @@ export function useReceiptScannerController() {
   const scanAnother = useCallback(() => {
     signalsRef.current = null;
     setLatestSignals(null);
+    setRecordingEnabled(false);
     dispatch({
       type: ScannerEventType.SCAN_ANOTHER,
       now: Date.now(),
@@ -195,13 +225,16 @@ export function useReceiptScannerController() {
     permissionStatus,
     cameraReady,
     latestSignals,
+    recordingEnabled,
     cameraActive:
       machineState.phase === ScannerPhase.READY || machineState.phase === ScannerPhase.SCANNING,
     startScanning,
-    cancelScanning,
+    finishScanning,
     scanAnother,
     viewReceipt,
     onCameraReady,
     onCameraFrame,
+    onRecordingFinished,
+    onRecordingError,
   };
 }

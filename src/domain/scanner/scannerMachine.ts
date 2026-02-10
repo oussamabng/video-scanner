@@ -29,6 +29,20 @@ export function scannerReducer(state, event) {
         startedAt: event.now,
       };
 
+    case ScannerEventType.FINISH_SCANNING:
+      if (state.phase !== ScannerPhase.SCANNING) {
+        return state;
+      }
+
+      return {
+        ...state,
+        phase: ScannerPhase.COMPLETE,
+        progress: 100,
+        activeError: null,
+        completedAt: event.now,
+        savedVideoPath: event.savedVideoPath || null,
+      };
+
     case ScannerEventType.CANCEL_SCANNING:
       return createInitialScannerState();
 
@@ -41,17 +55,7 @@ export function scannerReducer(state, event) {
         return state;
       }
 
-      const nextProgress = Math.min(100, state.progress + event.step);
-
-      if (nextProgress >= 100) {
-        return {
-          ...state,
-          phase: ScannerPhase.COMPLETE,
-          progress: 100,
-          activeError: null,
-          completedAt: event.now,
-        };
-      }
+      const nextProgress = Math.min(95, state.progress + event.step);
 
       return {
         ...state,
@@ -114,6 +118,7 @@ export function getScannerUiModel(state) {
     progress: state.progress,
     progressLabel: toProgressLabel(state.progress),
     adjustmentsCount: state.adjustmentsCount,
+    savedVideoPath: state.savedVideoPath,
     isScanning,
     isComplete,
     hasError,
