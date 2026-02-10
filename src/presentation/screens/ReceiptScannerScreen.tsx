@@ -175,7 +175,9 @@ export default function ReceiptScannerScreen() {
           <Text style={styles.tipText}>{uiModel.tip}</Text>
 
           {uiModel.isComplete && uiModel.savedVideoPath ? (
-            <Text style={styles.savedPathText}>Video saved on device: {uiModel.savedVideoPath}</Text>
+            <Text style={styles.savedPathText}>
+              Video saved on device: {uiModel.savedVideoPath}
+            </Text>
           ) : null}
 
           {permissionStatus === 'denied' ? (
@@ -192,7 +194,7 @@ export default function ReceiptScannerScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#050608',
+    backgroundColor: 'red',
   },
   dimLayer: {
     ...StyleSheet.absoluteFillObject,
@@ -255,7 +257,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingBottom: 14,
   },
-
 
   savedPathText: {
     color: '#86EFAC',
