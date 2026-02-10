@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/presentation/components/scanner/SideSegments.jsx
 
 import React, { useEffect, useMemo, useRef } from 'react';

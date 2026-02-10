@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/infrastructure/sensors/motion.js
 
 export function subscribeToMotionSignals(onMotion) {

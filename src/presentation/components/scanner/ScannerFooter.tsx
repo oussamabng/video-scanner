@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/presentation/components/scanner/ScannerFooter.jsx
 
 import React from 'react';

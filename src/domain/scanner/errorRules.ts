@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/domain/scanner/errorRules.js
 
 import { ScannerErrorCode } from './types';

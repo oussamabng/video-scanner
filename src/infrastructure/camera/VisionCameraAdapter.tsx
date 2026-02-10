@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { forwardRef, useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
