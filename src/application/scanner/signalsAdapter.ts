@@ -2,7 +2,11 @@
 // src/application/scanner/signalsAdapter.js
 
 import { evaluateScannerError } from '../../domain/scanner/errorRules';
-import { DEFAULT_SCAN_SIGNALS, ScannerErrorCode } from '../../domain/scanner/types';
+import {
+  DEFAULT_SCAN_SIGNALS,
+  ScannerErrorCode,
+  ScannerSimulationScenario,
+} from '../../domain/scanner/types';
 
 const DEMO_ERROR_POOL = [
   ScannerErrorCode.WRONG_DIRECTION,
@@ -118,6 +122,7 @@ export function createSimulatedSignals({
   isScanning,
   progress,
   forcedErrorCode,
+  scenario = ScannerSimulationScenario.NO_ERRORS,
 }) {
   if (!isScanning) {
     return DEFAULT_SCAN_SIGNALS;
@@ -134,6 +139,10 @@ export function createSimulatedSignals({
 
   if (forcedErrorCode) {
     return mergeScannerSignals(healthySignals, createSignalsForErrorCode(forcedErrorCode));
+  }
+
+  if (scenario === ScannerSimulationScenario.NO_ERRORS) {
+    return healthySignals;
   }
 
   const allowRandomError = progress > 8 && progress < 95;

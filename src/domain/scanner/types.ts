@@ -9,6 +9,7 @@ export const ScannerPhase = Object.freeze({
 
 export const ScannerEventType = Object.freeze({
   START_SCANNING: 'START_SCANNING',
+  FINISH_SCANNING: 'FINISH_SCANNING',
   CANCEL_SCANNING: 'CANCEL_SCANNING',
   PROGRESS_TICK: 'PROGRESS_TICK',
   ERROR_DETECTED: 'ERROR_DETECTED',
@@ -48,6 +49,11 @@ export const DEFAULT_SCAN_SIGNALS = Object.freeze({
   boundsConfidence: 0.9,
 });
 
+export const ScannerSimulationScenario = Object.freeze({
+  MOCK_ERRORS: 'MOCK_ERRORS',
+  NO_ERRORS: 'NO_ERRORS',
+});
+
 export function createInitialScannerState() {
   return {
     phase: ScannerPhase.READY,
@@ -56,5 +62,6 @@ export function createInitialScannerState() {
     adjustmentsCount: 0,
     startedAt: null,
     completedAt: null,
+    savedVideoPath: null,
   };
 }

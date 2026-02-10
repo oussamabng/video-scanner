@@ -26,7 +26,7 @@ export default function ScannerFooter({
   phase,
   permissionStatus,
   onStartScanning,
-  onCancelScanning,
+  onFinishScanning,
   onViewReceipt,
   onScanAnother,
 }) {
@@ -34,10 +34,10 @@ export default function ScannerFooter({
     return (
       <View style={styles.container}>
         <ScannerButton
-          title="Cancel"
-          onPress={onCancelScanning}
-          style={styles.cancelButton}
-          textStyle={styles.cancelButtonLabel}
+          title="Done"
+          onPress={onFinishScanning}
+          style={styles.doneButton}
+          textStyle={styles.doneButtonLabel}
         />
       </View>
     );
@@ -65,7 +65,7 @@ export default function ScannerFooter({
   return (
     <View style={styles.container}>
       <ScannerButton
-        title={permissionStatus === 'denied' ? 'Allow Camera & Start' : 'Start Scanning'}
+        title={permissionStatus === 'denied' ? 'Allow Camera & Start Recording' : 'Start Recording'}
         onPress={onStartScanning}
         style={styles.startButton}
         textStyle={styles.startButtonLabel}
@@ -104,11 +104,11 @@ const styles = StyleSheet.create({
   startButtonLabel: {
     color: '#F5F8FF',
   },
-  cancelButton: {
-    backgroundColor: '#EF4444',
+  doneButton: {
+    backgroundColor: '#22C55E',
   },
-  cancelButtonLabel: {
-    color: '#FFF6F6',
+  doneButtonLabel: {
+    color: '#F2FFF7',
   },
   viewReceiptButton: {
     backgroundColor: '#22C55E',
