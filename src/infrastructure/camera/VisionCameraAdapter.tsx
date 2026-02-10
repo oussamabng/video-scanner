@@ -28,70 +28,91 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
   },
   ref,
 ) {
-  const { hasPermission, requestPermission } = useCameraPermission();
+  // Some versions expose permissionStatus from the hook, some don’t
+  const camPerm = useCameraPermission();
+  const hasPermission = camPerm?.hasPermission;
+  const requestPermission = camPerm?.requestPermission;
+  const hookStatus = camPerm?.permissionStatus;
+
   const device = useCameraDevice('back');
   const cameraRef = useRef(null);
-  const [permissionStatus, setPermissionStatus] = useState('not-determined');
+
+  // Use hook status if present, fallback to manual status
+  const [permissionStatus, setPermissionStatus] = useState(
+    hookStatus ?? 'not-determined',
+  );
+
   const isRecordingRef = useRef(false);
 
   useImperativeHandle(ref, () => cameraRef.current);
 
+  // Keep local status in sync with hook status (when available)
   useEffect(() => {
-    let isMounted = true;
+    if (hookStatus) setPermissionStatus(hookStatus);
+  }, [hookStatus]);
 
-    Camera.getCameraPermissionStatus()
-      .then((status) => {
-        if (isMounted) {
-          setPermissionStatus(status);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setPermissionStatus('denied');
-        }
-      });
+  // Read permission status safely (works if sync OR async)
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const fn = Camera?.getCameraPermissionStatus;
+        if (typeof fn !== 'function') return;
+
+        // Handles both:
+        // - sync return: 'authorized' | 'denied' | ...
+        // - async return: Promise<'authorized' | ...>
+        const status = await Promise.resolve(fn());
+
+        if (alive && status) setPermissionStatus(status);
+      } catch {
+        if (alive) setPermissionStatus('denied');
+      }
+    })();
 
     return () => {
-      isMounted = false;
+      alive = false;
     };
   }, []);
 
-  useEffect(() => {
-    if (hasPermission) {
-      setPermissionStatus('granted');
-    }
-  }, [hasPermission]);
+  // Normalize “granted”/“authorized”
+  const hasCameraAccess =
+    Boolean(hasPermission) ||
+    permissionStatus === 'authorized' ||
+    permissionStatus === 'granted';
+
+  const isBlockedPermission =
+    permissionStatus === 'denied' || permissionStatus === 'restricted';
 
   useEffect(() => {
-    if (!hasPermission || !cameraRef.current || !isActive) {
-      return;
-    }
+    if (!hasCameraAccess || !cameraRef.current || !isActive) return;
 
     if (recordingEnabled && !isRecordingRef.current) {
       isRecordingRef.current = true;
+
       cameraRef.current.startRecording({
-        onRecordingFinished: (video) => {
+        onRecordingFinished: video => {
           isRecordingRef.current = false;
           onRecordingFinished?.(video);
         },
-        onRecordingError: (error) => {
+        onRecordingError: error => {
           isRecordingRef.current = false;
           onRecordingError?.(error);
         },
       });
+
       return;
     }
 
     if (!recordingEnabled && isRecordingRef.current) {
-      cameraRef.current
-        .stopRecording()
-        .catch((error) => {
-          isRecordingRef.current = false;
-          onRecordingError?.(error);
-        });
+      cameraRef.current.stopRecording().catch(error => {
+        isRecordingRef.current = false;
+        onRecordingError?.(error);
+      });
     }
   }, [
-    hasPermission,
+    hasCameraAccess,
     isActive,
     onRecordingError,
     onRecordingFinished,
@@ -99,18 +120,21 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
   ]);
 
   const onPressGrantPermission = useCallback(async () => {
-    const status = await requestPermission();
-    setPermissionStatus(status);
+    try {
+      if (typeof requestPermission !== 'function') return;
+      const status = await requestPermission();
+      if (status) setPermissionStatus(status);
+    } catch {
+      setPermissionStatus('denied');
+    }
   }, [requestPermission]);
 
   const onPressOpenSettings = useCallback(() => {
     Linking.openSettings();
   }, []);
 
-  const isBlockedPermission =
-    permissionStatus === 'denied' || permissionStatus === 'restricted';
-
-  if (!hasPermission) {
+  // If we don't have access, show a friendly permission UI
+  if (!hasCameraAccess) {
     return (
       <View style={[styles.stateContainer, style]}>
         <Text style={styles.stateTitle}>Camera permission required</Text>
@@ -119,6 +143,7 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
             ? 'Camera access is blocked. Open phone settings and enable camera to scan receipts.'
             : 'Allow camera access to scan receipts.'}
         </Text>
+
         <Pressable
           style={styles.permissionButton}
           onPress={
