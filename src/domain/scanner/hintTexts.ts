@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/domain/scanner/hintTexts.js
 
 import { ScannerErrorCode, ScannerPhase } from './types';

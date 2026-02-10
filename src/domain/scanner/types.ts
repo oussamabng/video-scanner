@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/domain/scanner/types.js
 
 export const ScannerPhase = Object.freeze({

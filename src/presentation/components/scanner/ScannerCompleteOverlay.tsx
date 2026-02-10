@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/presentation/components/scanner/ScannerCompleteOverlay.jsx
 
 import React from 'react';

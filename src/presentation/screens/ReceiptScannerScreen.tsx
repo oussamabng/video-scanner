@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/presentation/screens/ReceiptScannerScreen.jsx
 
 import React, { useMemo } from 'react';

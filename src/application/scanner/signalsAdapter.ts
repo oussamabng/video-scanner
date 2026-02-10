@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/application/scanner/signalsAdapter.js
 
 import { evaluateScannerError } from '../../domain/scanner/errorRules';

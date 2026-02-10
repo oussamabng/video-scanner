@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/infrastructure/camera/permissions.js
 
 import { Camera } from 'react-native-vision-camera';

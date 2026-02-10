@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/application/scanner/useReceiptScannerController.js
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';

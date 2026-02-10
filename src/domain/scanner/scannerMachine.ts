@@ -1,3 +1,4 @@
+// @ts-nocheck
 // src/domain/scanner/scannerMachine.js
 
 import {
