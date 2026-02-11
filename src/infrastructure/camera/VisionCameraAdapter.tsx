@@ -17,6 +17,21 @@ import {
 } from 'react-native-vision-camera';
 
 
+const SCANNER_CAMERA_DEBUG_TAG = '[camera-debug]';
+
+function logCameraDebug(event, payload) {
+  if (!__DEV__) {
+    return;
+  }
+
+  if (payload === undefined) {
+    console.log(`${SCANNER_CAMERA_DEBUG_TAG} ${event}`);
+    return;
+  }
+
+  console.log(`${SCANNER_CAMERA_DEBUG_TAG} ${event}`, payload);
+}
+
 const getDeltaMotion = () => {
   'worklet';
 
@@ -60,11 +75,16 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
   );
 
   const isRecordingRef = useRef(false);
+  const hasLoggedFirstFrameRef = useRef(false);
 
   useImperativeHandle(ref, () => cameraRef.current);
 
   const onFramePayload = useCallback(
     payload => {
+      if (!hasLoggedFirstFrameRef.current) {
+        hasLoggedFirstFrameRef.current = true;
+        logCameraDebug('first_frame_payload_forwarded', payload);
+      }
       onCameraFrame?.(payload);
     },
     [onCameraFrame],
@@ -76,6 +96,12 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
     [onFramePayload, runOnJSFactory],
   );
   const canBridgeFramePayloadToJS = Boolean(runOnJSFramePayload);
+
+  useEffect(() => {
+    if (!canBridgeFramePayloadToJS) {
+      logCameraDebug('worklets_bridge_unavailable');
+    }
+  }, [canBridgeFramePayloadToJS]);
 
   const frameProcessor = useFrameProcessor(
     frame => {

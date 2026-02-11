@@ -39,6 +39,21 @@ const MOCK_FRAME_MOTION_SIGNALS = Object.freeze({
   receiptTooClose: false,
 });
 
+const SCANNER_DEBUG_TAG = '[scanner-debug]';
+
+function logScannerDebug(event, payload) {
+  if (!__DEV__) {
+    return;
+  }
+
+  if (payload === undefined) {
+    console.log(`${SCANNER_DEBUG_TAG} ${event}`);
+    return;
+  }
+
+  console.log(`${SCANNER_DEBUG_TAG} ${event}`, payload);
+}
+
 function getProgressStep() {
   return 0.85 + Math.random() * 1.9;
 }
@@ -90,6 +105,8 @@ export function useReceiptScannerController() {
   const machineStateRef = useRef(machineState);
   const signalsRef = useRef(null);
   const hasCameraFrameSignalsRef = useRef(false);
+  const lastWarningLogRef = useRef({ code: null, at: 0 });
+  const hasLoggedFallbackRef = useRef(false);
   const warningStartRef = useRef({
     [ScannerErrorCode.TOO_FAST]: null,
     [ScannerErrorCode.DRIFTING]: null,
@@ -168,6 +185,10 @@ export function useReceiptScannerController() {
           : null;
 
       const hasCameraDrivenSignals = hasCameraFrameSignalsRef.current;
+      if (!hasCameraDrivenSignals && !hasLoggedFallbackRef.current) {
+        hasLoggedFallbackRef.current = true;
+        logScannerDebug('using_mock_motion_fallback', MOCK_FRAME_MOTION_SIGNALS);
+      }
 
       const currentSignals = hasCameraDrivenSignals
         ? signalsRef.current
@@ -191,6 +212,22 @@ export function useReceiptScannerController() {
 
       const detectedError = persistedMotionError || resolveScannerError(currentSignals);
 
+      if (persistedMotionError) {
+        const nowMs = Date.now();
+        if (
+          lastWarningLogRef.current.code !== persistedMotionError.code ||
+          nowMs - lastWarningLogRef.current.at > 1000
+        ) {
+          lastWarningLogRef.current = { code: persistedMotionError.code, at: nowMs };
+          logScannerDebug('persisted_motion_warning', {
+            code: persistedMotionError.code,
+            verticalSpeed: currentSignals?.verticalSpeed,
+            rotation: currentSignals?.rotation,
+            receiptTooClose: currentSignals?.receiptTooClose,
+          });
+        }
+      }
+
       if (currentState.activeError) {
         if (detectedError) {
           dispatch({
@@ -199,12 +236,14 @@ export function useReceiptScannerController() {
             now,
           });
         } else if (now - currentState.activeError.detectedAt >= ERROR_HOLD_MS) {
+          logScannerDebug('error_resolved', { code: currentState.activeError.code });
           dispatch({
             type: ScannerEventType.ERROR_RESOLVED,
             now,
           });
         }
       } else if (detectedError) {
+        logScannerDebug('error_detected', { code: detectedError.code });
         dispatch({
           type: ScannerEventType.ERROR_DETECTED,
           error: detectedError,
@@ -236,8 +275,11 @@ export function useReceiptScannerController() {
     setPermissionStatus(status);
 
     if (status === 'granted') {
+      logScannerDebug('start_scanning_granted');
       setRecordingEnabled(true);
       hasCameraFrameSignalsRef.current = false;
+      hasLoggedFallbackRef.current = false;
+      lastWarningLogRef.current = { code: null, at: 0 };
       warningStartRef.current = {
         [ScannerErrorCode.TOO_FAST]: null,
         [ScannerErrorCode.DRIFTING]: null,
@@ -247,6 +289,8 @@ export function useReceiptScannerController() {
         type: ScannerEventType.START_SCANNING,
         now: Date.now(),
       });
+    } else {
+      logScannerDebug('start_scanning_denied', { status });
     }
   }, []);
 
@@ -262,6 +306,7 @@ export function useReceiptScannerController() {
   );
 
   const onRecordingError = useCallback(() => {
+    logScannerDebug('recording_error');
     dispatch({
       type: ScannerEventType.CANCEL_SCANNING,
       now: Date.now(),
@@ -269,10 +314,13 @@ export function useReceiptScannerController() {
   }, []);
 
   const scanAnother = useCallback(() => {
+    logScannerDebug('scan_another_pressed');
     signalsRef.current = null;
     setLatestSignals(null);
     setRecordingEnabled(false);
     hasCameraFrameSignalsRef.current = false;
+    hasLoggedFallbackRef.current = false;
+    lastWarningLogRef.current = { code: null, at: 0 };
     warningStartRef.current = {
       [ScannerErrorCode.TOO_FAST]: null,
       [ScannerErrorCode.DRIFTING]: null,
@@ -298,6 +346,9 @@ export function useReceiptScannerController() {
         return;
       }
 
+      if (!hasCameraFrameSignalsRef.current) {
+        logScannerDebug('camera_frame_signals_received');
+      }
       hasCameraFrameSignalsRef.current = true;
       const normalizedSignals = normalizeCameraSignals(rawPayload);
       updateSignals(normalizedSignals);
