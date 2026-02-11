@@ -16,12 +16,20 @@ export function evaluateScannerError(signals) {
     return createRuleError(ScannerErrorCode.OUT_OF_FRAME);
   }
 
+  if (signals.receiptTooClose === true) {
+    return createRuleError(ScannerErrorCode.TOO_CLOSE);
+  }
+
   if (signals.direction && signals.direction !== 'down') {
     return createRuleError(ScannerErrorCode.WRONG_DIRECTION);
   }
 
   if (typeof signals.verticalSpeed === 'number' && signals.verticalSpeed > 1.35) {
     return createRuleError(ScannerErrorCode.TOO_FAST);
+  }
+
+  if (typeof signals.rotation === 'number' && Math.abs(signals.rotation) > 0.18) {
+    return createRuleError(ScannerErrorCode.DRIFTING);
   }
 
   if (typeof signals.stability === 'number' && signals.stability < 0.45) {

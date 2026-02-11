@@ -12,7 +12,32 @@ import {
   Camera,
   useCameraDevice,
   useCameraPermission,
+  useFrameProcessor,
 } from 'react-native-vision-camera';
+
+let runOnJSFn = callback => callback;
+
+try {
+  const maybeWorkletsCore = require('react-native-worklets-core');
+  if (typeof maybeWorkletsCore?.runOnJS === 'function') {
+    runOnJSFn = maybeWorkletsCore.runOnJS;
+  }
+} catch {
+  // Jest environment without native Worklets module.
+}
+
+const getDeltaMotion = () => {
+  'worklet';
+
+  // Temporary mock until the native C++ pipeline is wired.
+  return {
+    dx: 0.06,
+    dy: 0.15,
+    rotation: 0.03,
+    speed: 1.86,
+    validMotion: true,
+  };
+};
 
 const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
   {
@@ -24,6 +49,7 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
     onError,
     onRecordingFinished,
     onRecordingError,
+    onCameraFrame,
     children,
   },
   ref,
@@ -45,6 +71,32 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
   const isRecordingRef = useRef(false);
 
   useImperativeHandle(ref, () => cameraRef.current);
+
+  const onFramePayload = useCallback(
+    payload => {
+      onCameraFrame?.(payload);
+    },
+    [onCameraFrame],
+  );
+
+  const frameProcessor = useFrameProcessor(
+    frame => {
+      'worklet';
+      const motion = getDeltaMotion();
+      const frameTimestampMs =
+        typeof frame.timestamp === 'number'
+          ? frame.timestamp / 1000000
+          : 0;
+
+      runOnJSFn(onFramePayload)({
+        frameTimestampMs,
+        motion,
+        // Mock value to keep the "too close" warning pipeline testable.
+        receiptTooClose: false,
+      });
+    },
+    [onFramePayload],
+  );
 
   // Keep local status in sync with hook status (when available)
   useEffect(() => {
@@ -174,6 +226,7 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
         torch={torchEnabled ? 'on' : 'off'}
         onInitialized={onReady}
         onError={onError}
+        frameProcessor={frameProcessor}
       />
       {children}
     </View>

@@ -25,6 +25,8 @@ export const ScannerErrorCode = Object.freeze({
   OUT_OF_FRAME: 'OUT_OF_FRAME',
   TOO_DARK: 'TOO_DARK',
   GLARE: 'GLARE',
+  DRIFTING: 'DRIFTING',
+  TOO_CLOSE: 'TOO_CLOSE',
 });
 
 export const SCANNER_COLORS = Object.freeze({

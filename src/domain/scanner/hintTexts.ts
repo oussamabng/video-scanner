@@ -52,6 +52,16 @@ const ERROR_TEXTS = Object.freeze({
     title: 'Reduce Glare',
     message: 'Tilt slightly to remove reflections',
   },
+  [ScannerErrorCode.DRIFTING]: {
+    icon: '⤾',
+    title: 'Hold Straight',
+    message: 'Keep the phone straight while scanning',
+  },
+  [ScannerErrorCode.TOO_CLOSE]: {
+    icon: '⇕',
+    title: 'Move Back',
+    message: 'Move the camera a little farther from the receipt',
+  },
 });
 
 export function getPhaseTexts(phase) {

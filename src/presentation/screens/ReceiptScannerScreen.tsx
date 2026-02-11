@@ -46,6 +46,7 @@ export default function ReceiptScannerScreen() {
     viewReceipt,
     onRecordingFinished,
     onRecordingError,
+    onCameraFrame,
   } = useReceiptScannerController();
 
   const scanLineTravelDistance = useMemo(
@@ -93,6 +94,7 @@ export default function ReceiptScannerScreen() {
         onReady={onCameraReady}
         onRecordingFinished={onRecordingFinished}
         onRecordingError={onRecordingError}
+        onCameraFrame={onCameraFrame}
       />
       <View style={styles.dimLayer} pointerEvents="none" />
 

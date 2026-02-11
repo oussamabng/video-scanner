@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   ERROR_HOLD_MS,
+  ScannerErrorCode,
   ScannerEventType,
   ScannerPhase,
   ScannerSimulationScenario,
@@ -23,12 +24,52 @@ import {
 import { subscribeToMotionSignals } from '../../infrastructure/sensors/motion';
 
 const SCAN_TICK_MS = 160;
+const WARNING_PERSISTENCE_MS = 400;
+const TOO_FAST_THRESHOLD = 1.35;
+const DRIFTING_ROTATION_THRESHOLD = 0.18;
 // Default demo mode is clean scanning (no simulated errors).
 // To test error states locally, switch this to ScannerSimulationScenario.MOCK_ERRORS.
 const DEFAULT_SIMULATION_SCENARIO = ScannerSimulationScenario.NO_ERRORS;
 
 function getProgressStep() {
   return 0.85 + Math.random() * 1.9;
+}
+
+function getPersistedMotionWarning(signals, now, warningStartRef) {
+  const conditions = {
+    [ScannerErrorCode.TOO_FAST]:
+      typeof signals?.verticalSpeed === 'number' && signals.verticalSpeed > TOO_FAST_THRESHOLD,
+    [ScannerErrorCode.DRIFTING]:
+      typeof signals?.rotation === 'number' &&
+      Math.abs(signals.rotation) > DRIFTING_ROTATION_THRESHOLD,
+    [ScannerErrorCode.TOO_CLOSE]: signals?.receiptTooClose === true,
+  };
+
+  const priorityOrder = [
+    ScannerErrorCode.TOO_CLOSE,
+    ScannerErrorCode.DRIFTING,
+    ScannerErrorCode.TOO_FAST,
+  ];
+
+  priorityOrder.forEach(errorCode => {
+    if (conditions[errorCode]) {
+      if (!warningStartRef.current[errorCode]) {
+        warningStartRef.current[errorCode] = now;
+      }
+      return;
+    }
+
+    warningStartRef.current[errorCode] = null;
+  });
+
+  for (const errorCode of priorityOrder) {
+    const startedAt = warningStartRef.current[errorCode];
+    if (conditions[errorCode] && startedAt && now - startedAt >= WARNING_PERSISTENCE_MS) {
+      return { code: errorCode };
+    }
+  }
+
+  return null;
 }
 
 export function useReceiptScannerController() {
@@ -40,6 +81,11 @@ export function useReceiptScannerController() {
 
   const machineStateRef = useRef(machineState);
   const signalsRef = useRef(null);
+  const warningStartRef = useRef({
+    [ScannerErrorCode.TOO_FAST]: null,
+    [ScannerErrorCode.DRIFTING]: null,
+    [ScannerErrorCode.TOO_CLOSE]: null,
+  });
 
   const completeScanning = useCallback((savedVideoPath = null) => {
     if (machineStateRef.current.phase !== ScannerPhase.SCANNING) {
@@ -112,15 +158,26 @@ export function useReceiptScannerController() {
           ? 'TOO_FAST'
           : null;
 
-      const simulatedSignals = createSimulatedSignals({
-        isScanning: true,
-        progress: currentState.progress,
-        forcedErrorCode,
-        scenario: simulationScenario,
-      });
+      const hasCameraDrivenSignals = Boolean(signalsRef.current);
 
-      const currentSignals = updateSignals(simulatedSignals);
-      const detectedError = resolveScannerError(currentSignals);
+      const currentSignals = hasCameraDrivenSignals
+        ? signalsRef.current
+        : updateSignals(
+            createSimulatedSignals({
+              isScanning: true,
+              progress: currentState.progress,
+              forcedErrorCode,
+              scenario: simulationScenario,
+            }),
+          );
+
+      const persistedMotionError = getPersistedMotionWarning(
+        currentSignals,
+        now,
+        warningStartRef,
+      );
+
+      const detectedError = persistedMotionError || resolveScannerError(currentSignals);
 
       if (currentState.activeError) {
         if (detectedError) {
@@ -168,6 +225,11 @@ export function useReceiptScannerController() {
 
     if (status === 'granted') {
       setRecordingEnabled(true);
+      warningStartRef.current = {
+        [ScannerErrorCode.TOO_FAST]: null,
+        [ScannerErrorCode.DRIFTING]: null,
+        [ScannerErrorCode.TOO_CLOSE]: null,
+      };
       dispatch({
         type: ScannerEventType.START_SCANNING,
         now: Date.now(),
@@ -179,9 +241,12 @@ export function useReceiptScannerController() {
     completeScanning();
   }, [completeScanning]);
 
-  const onRecordingFinished = useCallback((video) => {
-    completeScanning(video?.path || null);
-  }, [completeScanning]);
+  const onRecordingFinished = useCallback(
+    (video) => {
+      completeScanning(video?.path || null);
+    },
+    [completeScanning],
+  );
 
   const onRecordingError = useCallback(() => {
     dispatch({
@@ -211,22 +276,12 @@ export function useReceiptScannerController() {
 
   const onCameraFrame = useCallback(
     (rawPayload) => {
-      const normalizedSignals = normalizeCameraSignals(rawPayload);
-      const mergedSignals = updateSignals(normalizedSignals);
-
       if (machineStateRef.current.phase !== ScannerPhase.SCANNING) {
         return;
       }
 
-      const maybeError = resolveScannerError(mergedSignals);
-
-      if (maybeError) {
-        dispatch({
-          type: ScannerEventType.ERROR_DETECTED,
-          error: maybeError,
-          now: Date.now(),
-        });
-      }
+      const normalizedSignals = normalizeCameraSignals(rawPayload);
+      updateSignals(normalizedSignals);
     },
     [updateSignals],
   );
