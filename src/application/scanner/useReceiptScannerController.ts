@@ -276,7 +276,8 @@ export function useReceiptScannerController() {
 
     if (status === 'granted') {
       logScannerDebug('start_scanning_granted');
-      setRecordingEnabled(true);
+      // Recording is kept disabled to avoid native instability while warnings are active.
+      setRecordingEnabled(false);
       hasCameraFrameSignalsRef.current = false;
       hasLoggedFallbackRef.current = false;
       lastWarningLogRef.current = { code: null, at: 0 };

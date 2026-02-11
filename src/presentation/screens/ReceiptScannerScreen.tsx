@@ -196,7 +196,7 @@ export default function ReceiptScannerScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: 'red',
+    backgroundColor: '#050608',
   },
   dimLayer: {
     ...StyleSheet.absoluteFillObject,

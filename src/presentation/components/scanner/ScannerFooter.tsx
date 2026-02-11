@@ -65,7 +65,7 @@ export default function ScannerFooter({
   return (
     <View style={styles.container}>
       <ScannerButton
-        title={permissionStatus === 'denied' ? 'Allow Camera & Start Recording' : 'Start Recording'}
+        title={permissionStatus === 'denied' ? 'Allow Camera & Start Scanning' : 'Start Scanning'}
         onPress={onStartScanning}
         style={styles.startButton}
         textStyle={styles.startButtonLabel}
