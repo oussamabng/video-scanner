@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -15,8 +16,6 @@ import {
   useFrameProcessor,
 } from 'react-native-vision-camera';
 
-const runOnJSFactory = global?.Worklets?.createRunOnJS;
-const canBridgeFramePayloadToJS = typeof runOnJSFactory === 'function';
 
 const getDeltaMotion = () => {
   'worklet';
@@ -71,6 +70,13 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
     [onCameraFrame],
   );
 
+  const runOnJSFactory = global?.Worklets?.createRunOnJS;
+  const runOnJSFramePayload = useMemo(
+    () => (typeof runOnJSFactory === 'function' ? runOnJSFactory(onFramePayload) : null),
+    [onFramePayload, runOnJSFactory],
+  );
+  const canBridgeFramePayloadToJS = Boolean(runOnJSFramePayload);
+
   const frameProcessor = useFrameProcessor(
     frame => {
       'worklet';
@@ -85,14 +91,14 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
           ? frame.timestamp / 1000000
           : 0;
 
-      runOnJSFactory(onFramePayload)({
+      runOnJSFramePayload({
         frameTimestampMs,
         motion,
         // Mock value to keep the "too close" warning pipeline testable.
         receiptTooClose: false,
       });
     },
-    [onFramePayload],
+    [runOnJSFramePayload],
   );
 
   // Keep local status in sync with hook status (when available)

@@ -30,6 +30,14 @@ const DRIFTING_ROTATION_THRESHOLD = 0.18;
 // Default demo mode is clean scanning (no simulated errors).
 // To test error states locally, switch this to ScannerSimulationScenario.MOCK_ERRORS.
 const DEFAULT_SIMULATION_SCENARIO = ScannerSimulationScenario.NO_ERRORS;
+const MOCK_FRAME_MOTION_SIGNALS = Object.freeze({
+  verticalSpeed: 1.86,
+  dx: 0.06,
+  dy: 0.15,
+  rotation: 0.03,
+  validMotion: true,
+  receiptTooClose: false,
+});
 
 function getProgressStep() {
   return 0.85 + Math.random() * 1.9;
@@ -81,6 +89,7 @@ export function useReceiptScannerController() {
 
   const machineStateRef = useRef(machineState);
   const signalsRef = useRef(null);
+  const hasCameraFrameSignalsRef = useRef(false);
   const warningStartRef = useRef({
     [ScannerErrorCode.TOO_FAST]: null,
     [ScannerErrorCode.DRIFTING]: null,
@@ -158,17 +167,20 @@ export function useReceiptScannerController() {
           ? 'TOO_FAST'
           : null;
 
-      const hasCameraDrivenSignals = Boolean(signalsRef.current);
+      const hasCameraDrivenSignals = hasCameraFrameSignalsRef.current;
 
       const currentSignals = hasCameraDrivenSignals
         ? signalsRef.current
         : updateSignals(
-            createSimulatedSignals({
-              isScanning: true,
-              progress: currentState.progress,
-              forcedErrorCode,
-              scenario: simulationScenario,
-            }),
+            mergeScannerSignals(
+              createSimulatedSignals({
+                isScanning: true,
+                progress: currentState.progress,
+                forcedErrorCode,
+                scenario: simulationScenario,
+              }),
+              MOCK_FRAME_MOTION_SIGNALS,
+            ),
           );
 
       const persistedMotionError = getPersistedMotionWarning(
@@ -225,6 +237,7 @@ export function useReceiptScannerController() {
 
     if (status === 'granted') {
       setRecordingEnabled(true);
+      hasCameraFrameSignalsRef.current = false;
       warningStartRef.current = {
         [ScannerErrorCode.TOO_FAST]: null,
         [ScannerErrorCode.DRIFTING]: null,
@@ -259,11 +272,16 @@ export function useReceiptScannerController() {
     signalsRef.current = null;
     setLatestSignals(null);
     setRecordingEnabled(false);
+    hasCameraFrameSignalsRef.current = false;
+    warningStartRef.current = {
+      [ScannerErrorCode.TOO_FAST]: null,
+      [ScannerErrorCode.DRIFTING]: null,
+      [ScannerErrorCode.TOO_CLOSE]: null,
+    };
     dispatch({
       type: ScannerEventType.SCAN_ANOTHER,
       now: Date.now(),
     });
-    setCameraReady(false);
   }, []);
 
   const viewReceipt = useCallback(() => {
@@ -280,6 +298,7 @@ export function useReceiptScannerController() {
         return;
       }
 
+      hasCameraFrameSignalsRef.current = true;
       const normalizedSignals = normalizeCameraSignals(rawPayload);
       updateSignals(normalizedSignals);
     },
