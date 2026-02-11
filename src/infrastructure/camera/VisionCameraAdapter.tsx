@@ -15,16 +15,8 @@ import {
   useFrameProcessor,
 } from 'react-native-vision-camera';
 
-let runOnJSFn = callback => callback;
-
-try {
-  const maybeWorkletsCore = require('react-native-worklets-core');
-  if (typeof maybeWorkletsCore?.runOnJS === 'function') {
-    runOnJSFn = maybeWorkletsCore.runOnJS;
-  }
-} catch {
-  // Jest environment without native Worklets module.
-}
+const runOnJSFactory = global?.Worklets?.createRunOnJS;
+const canBridgeFramePayloadToJS = typeof runOnJSFactory === 'function';
 
 const getDeltaMotion = () => {
   'worklet';
@@ -82,13 +74,18 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
   const frameProcessor = useFrameProcessor(
     frame => {
       'worklet';
+
+      if (!canBridgeFramePayloadToJS) {
+        return;
+      }
+
       const motion = getDeltaMotion();
       const frameTimestampMs =
         typeof frame.timestamp === 'number'
           ? frame.timestamp / 1000000
           : 0;
 
-      runOnJSFn(onFramePayload)({
+      runOnJSFactory(onFramePayload)({
         frameTimestampMs,
         motion,
         // Mock value to keep the "too close" warning pipeline testable.
@@ -226,7 +223,7 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
         torch={torchEnabled ? 'on' : 'off'}
         onInitialized={onReady}
         onError={onError}
-        frameProcessor={frameProcessor}
+        frameProcessor={canBridgeFramePayloadToJS ? frameProcessor : undefined}
       />
       {children}
     </View>
