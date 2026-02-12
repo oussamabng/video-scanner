@@ -45,6 +45,10 @@ export function mergeScannerSignals(baseSignals, patchSignals) {
       asNumber(merged.boundsConfidence, DEFAULT_SCAN_SIGNALS.boundsConfidence),
     ),
     verticalSpeed: Math.max(0, asNumber(merged.verticalSpeed, DEFAULT_SCAN_SIGNALS.verticalSpeed)),
+    dx: asNumber(merged.dx, 0),
+    dy: asNumber(merged.dy, 0),
+    rotation: asNumber(merged.rotation, 0),
+    receiptTooClose: Boolean(merged.receiptTooClose),
     direction: merged.direction || 'down',
   };
 }
@@ -68,8 +72,10 @@ export function normalizeCameraSignals(rawPayload = {}) {
 
   const direction = rawPayload.direction ?? rawPayload.movement?.direction ?? 'down';
 
+  const motion = rawPayload.motion || {};
+
   const verticalSpeed = asNumber(
-    rawPayload.verticalSpeed ?? rawPayload.movement?.speed ?? rawPayload.motionSpeed,
+    rawPayload.verticalSpeed ?? rawPayload.movement?.speed ?? rawPayload.motionSpeed ?? motion.speed,
     DEFAULT_SCAN_SIGNALS.verticalSpeed,
   );
 
@@ -96,6 +102,16 @@ export function normalizeCameraSignals(rawPayload = {}) {
     brightness,
     glare,
     boundsConfidence,
+    dx: asNumber(rawPayload.dx ?? motion.dx, 0),
+    dy: asNumber(rawPayload.dy ?? motion.dy, 0),
+    rotation: asNumber(rawPayload.rotation ?? motion.rotation, 0),
+    validMotion:
+      typeof rawPayload.validMotion === 'boolean'
+        ? rawPayload.validMotion
+        : typeof motion.validMotion === 'boolean'
+          ? motion.validMotion
+          : true,
+    receiptTooClose: Boolean(rawPayload.receiptTooClose),
   });
 }
 

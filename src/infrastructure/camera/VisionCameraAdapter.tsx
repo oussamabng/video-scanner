@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -12,7 +13,37 @@ import {
   Camera,
   useCameraDevice,
   useCameraPermission,
+  useFrameProcessor,
 } from 'react-native-vision-camera';
+
+
+const SCANNER_CAMERA_DEBUG_TAG = '[camera-debug]';
+
+function logCameraDebug(event, payload) {
+  if (!__DEV__) {
+    return;
+  }
+
+  if (payload === undefined) {
+    console.log(`${SCANNER_CAMERA_DEBUG_TAG} ${event}`);
+    return;
+  }
+
+  console.log(`${SCANNER_CAMERA_DEBUG_TAG} ${event}`, payload);
+}
+
+const getDeltaMotion = () => {
+  'worklet';
+
+  // Temporary mock until the native C++ pipeline is wired.
+  return {
+    dx: 0.06,
+    dy: 0.15,
+    rotation: 0.03,
+    speed: 1.86,
+    validMotion: true,
+  };
+};
 
 const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
   {
@@ -24,6 +55,7 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
     onError,
     onRecordingFinished,
     onRecordingError,
+    onCameraFrame,
     children,
   },
   ref,
@@ -43,8 +75,57 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
   );
 
   const isRecordingRef = useRef(false);
+  const hasLoggedFirstFrameRef = useRef(false);
 
   useImperativeHandle(ref, () => cameraRef.current);
+
+  const onFramePayload = useCallback(
+    payload => {
+      if (!hasLoggedFirstFrameRef.current) {
+        hasLoggedFirstFrameRef.current = true;
+        logCameraDebug('first_frame_payload_forwarded', payload);
+      }
+      onCameraFrame?.(payload);
+    },
+    [onCameraFrame],
+  );
+
+  const runOnJSFactory = global?.Worklets?.createRunOnJS;
+  const runOnJSFramePayload = useMemo(
+    () => (typeof runOnJSFactory === 'function' ? runOnJSFactory(onFramePayload) : null),
+    [onFramePayload, runOnJSFactory],
+  );
+  const canBridgeFramePayloadToJS = Boolean(runOnJSFramePayload);
+
+  useEffect(() => {
+    if (!canBridgeFramePayloadToJS) {
+      logCameraDebug('worklets_bridge_unavailable');
+    }
+  }, [canBridgeFramePayloadToJS]);
+
+  const frameProcessor = useFrameProcessor(
+    frame => {
+      'worklet';
+
+      if (!canBridgeFramePayloadToJS) {
+        return;
+      }
+
+      const motion = getDeltaMotion();
+      const frameTimestampMs =
+        typeof frame.timestamp === 'number'
+          ? frame.timestamp / 1000000
+          : 0;
+
+      runOnJSFramePayload({
+        frameTimestampMs,
+        motion,
+        // Mock value to keep the "too close" warning pipeline testable.
+        receiptTooClose: false,
+      });
+    },
+    [runOnJSFramePayload],
+  );
 
   // Keep local status in sync with hook status (when available)
   useEffect(() => {
@@ -174,6 +255,7 @@ const VisionCameraAdapter = forwardRef(function VisionCameraAdapter(
         torch={torchEnabled ? 'on' : 'off'}
         onInitialized={onReady}
         onError={onError}
+        frameProcessor={canBridgeFramePayloadToJS ? frameProcessor : undefined}
       />
       {children}
     </View>
